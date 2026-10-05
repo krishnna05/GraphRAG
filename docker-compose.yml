@@ -1,0 +1,41 @@
+services:
+  neo4j:
+    image: neo4j:2026.08.1-community
+    container_name: graphrag-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in your .env file}"
+    volumes:
+      - neo4j_data:/data
+
+  ollama:
+    image: ollama/ollama:0.35.1
+    container_name: graphrag-ollama
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama serve & sleep 5 && ollama pull llama3.2 && wait"]
+
+  streamlit:
+    platform: linux/amd64
+    build: .
+    container_name: graphrag-streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in your .env file}
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: llama3.2
+    depends_on:
+      - neo4j
+      - ollama
+
+volumes:
+  neo4j_data:
+  ollama_data:
