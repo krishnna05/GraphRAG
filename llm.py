@@ -1,5 +1,7 @@
 import json
 from typing import List, Tuple
+from urllib.parse import urlsplit
+
 from ollama import Client as OllamaClient
 from models import GraphEdge, GraphNode, normalize_entity_name
 
@@ -9,6 +11,7 @@ class OllamaService:
 
     def __init__(self, host: str):
         self.client = OllamaClient(host=host)
+        self.supports_structured_outputs = urlsplit(host).hostname != "ollama.com"
 
     def extract_graph_elements(
         self, document_content: str, document_name: str, model_name: str
@@ -27,12 +30,16 @@ Return strictly valid JSON with this schema:
 Text to analyze:
 {document_content}
 """
+        chat_options = {"format": "json"} if self.supports_structured_outputs else {}
         completion = self.client.chat(
             model=model_name,
             messages=[{"role": "user", "content": prompt}],
-            format="json",
+            **chat_options,
         )
-        parsed = json.loads(completion["message"]["content"])
+        response_content = completion["message"]["content"]
+        if not response_content or not response_content.strip():
+            raise ValueError(f"Ollama returned an empty response for model '{model_name}'.")
+        parsed = json.loads(response_content)
 
         nodes: List[GraphNode] = []
         entity_lookup = {}
