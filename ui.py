@@ -20,9 +20,15 @@ def main() -> None:
     st.sidebar.markdown("### **GraphRAG**")
     st.sidebar.divider()
     st.sidebar.header("⚙️ Graph Configuration")
-    db_uri = st.sidebar.text_input("Neo4j Database URI", NEO4J_URI)
-    db_user = st.sidebar.text_input("Neo4j Username", NEO4J_USER)
-    db_pass = st.sidebar.text_input("Neo4j Password", type="password", value=NEO4J_PASSWORD)
+    if NEO4J_PASSWORD:
+        db_uri = NEO4J_URI
+        db_user = NEO4J_USER
+        db_pass = NEO4J_PASSWORD
+        st.sidebar.caption("Neo4j connection is managed by the app deployment.")
+    else:
+        db_uri = st.sidebar.text_input("Neo4j Database URI", NEO4J_URI)
+        db_user = st.sidebar.text_input("Neo4j Username", NEO4J_USER)
+        db_pass = st.sidebar.text_input("Neo4j Password", type="password")
     model_choice = st.sidebar.selectbox("Local Inference Model", AVAILABLE_MODELS, index=AVAILABLE_MODELS.index(DEFAULT_MODEL) if DEFAULT_MODEL in AVAILABLE_MODELS else 0)
 
     if "has_nodes" not in st.session_state:
