@@ -1,9 +1,31 @@
 import json
-from typing import List, Tuple
+from typing import Any, Dict, List, Tuple
 from urllib.parse import urlsplit
 
 from ollama import Client as OllamaClient
 from models import GraphEdge, GraphNode, normalize_entity_name
+
+
+def _parse_json_object(content: str, model_name: str) -> Dict[str, Any]:
+    if not content or not content.strip():
+        raise ValueError(f"Ollama returned an empty response for model '{model_name}'.")
+
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        object_start = content.find("{")
+        if object_start == -1:
+            raise ValueError(f"Ollama did not return a JSON object for model '{model_name}'.") from None
+
+        try:
+            parsed, _ = json.JSONDecoder().raw_decode(content[object_start:])
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Ollama returned malformed JSON for model '{model_name}'.") from exc
+
+    if not isinstance(parsed, dict):
+        raise ValueError(f"Ollama returned a non-object JSON response for model '{model_name}'.")
+
+    return parsed
 
 
 class OllamaService:
@@ -17,7 +39,8 @@ class OllamaService:
         self, document_content: str, document_name: str, model_name: str
     ) -> Tuple[List[GraphNode], List[GraphEdge]]:
         prompt = f"""You are a structural parser. Extract core entities and relations from the text.
-Return strictly valid JSON with this schema:
+Return one valid JSON object only: no markdown fences or prose before or after it.
+Use this schema:
 {{
   "nodes": [
     {{"name": "Entity Name", "type": "PERSON/ORGANIZATION/CONCEPT/TECHNOLOGY/EVENT", "summary": "Brief explanation"}}
@@ -37,9 +60,7 @@ Text to analyze:
             **chat_options,
         )
         response_content = completion["message"]["content"]
-        if not response_content or not response_content.strip():
-            raise ValueError(f"Ollama returned an empty response for model '{model_name}'.")
-        parsed = json.loads(response_content)
+        parsed = _parse_json_object(response_content, model_name)
 
         nodes: List[GraphNode] = []
         entity_lookup = {}
